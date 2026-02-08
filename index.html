@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1 Nation Market</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root { --main-color: #008080; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+        header { background: var(--main-color); color: white; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; }
+        .container { padding: 15px; }
+        .product-card { background: white; margin-bottom: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .admin-btn { background: #333; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; position: fixed; bottom: 20px; right: 20px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; }
+        .modal-content { background: white; margin: 15% auto; padding: 20px; width: 80%; border-radius: 10px; }
+        .hidden { display: none; }
+        input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        .delete-btn { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<header>1 Nation Market</header>
+
+<div class="container" id="product-list">
+    <p style="text-align: center;">सामान लोड हो रहा है...</p>
+</div>
+
+<button class="admin-btn" onclick="openLogin()">🔒 Admin</button>
+
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <h3>एडमिन लॉगिन</h3>
+        <input type="password" id="adminPass" placeholder="पासवर्ड डालें (tamir@lI00769)">
+        <button onclick="checkAdmin()" style="background: var(--main-color); color: white;">प्रवेश करें</button>
+        <button onclick="closeModal()" style="background: #ccc; border: none;">बंद करें</button>
+    </div>
+</div>
+
+<div id="adminDashboard" class="modal">
+    <div class="modal-content">
+        <h3>1 Nation Market: एडमिन पैनल</h3>
+        <input type="text" id="pName" placeholder="सामान का नाम">
+        <input type="number" id="pPrice" placeholder="कीमत (₹)">
+        <button onclick="saveToFirebase()" style="background: #28a745; color: white;">सामान जोड़ें (Cloud Save)</button>
+        <button onclick="logoutAdmin()" style="background: #dc3545; color: white; margin-top: 20px;">लॉगआउट (Exit)</button>
+    </div>
+</div>
+
+<script>
+// --- तामीर अली: Firebase Config ---
+const firebaseConfig = {
+    apiKey: "AIzaSyCfAv_Q7rMopLnI5OctejL_ypJu1TCfNFk",
+    authDomain: "nation-market.firebaseapp.com",
+    projectId: "nation-market",
+    storageBucket: "nation-market.firebasestorage.app",
+    messagingSenderId: "185693599484",
+    appId: "1:185693599484:web:6fd06fe167cb4f613f4979"
+};
+
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let isAdmin = false;
+
+// 1. क्लाउड से डेटा लोड करना
+function loadProducts() {
+    db.collection("products").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+        let html = "";
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            html += `
+                <div class="product-card">
+                    <div>
+                        <strong>${data.name}</strong><br>
+                        ₹${data.price}
+                    </div>
+                    ${isAdmin ? `<button class="delete-btn" onclick="deleteProduct('${doc.id}')">हटाएं</button>` : ""}
+                </div>`;
+        });
+        document.getElementById("product-list").innerHTML = html || "<p style='text-align:center;'>अभी कोई सामान नहीं है।</p>";
+    });
+}
+
+// 2. एडमिन लॉगिन चेक [cite: 2026-02-07]
+function checkAdmin() {
+    const pass = document.getElementById("adminPass").value;
+    if (pass === "tamir@lI00769") {
+        isAdmin = true;
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("adminDashboard").style.display = "block";
+        loadProducts();
+    } else {
+        alert("गलत पासवर्ड! अक्ल का इस्तेमाल करें।");
+    }
+}
+
+// 3. क्लाउड में सेव करना (No Copy-Paste!)
+async function saveToFirebase() {
+    const name = document.getElementById("pName").value;
+    const price = document.getElementById("pPrice").value;
+
+    if (name && price) {
+        try {
+            await db.collection("products").add({
+                name: name,
+                price: price,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert("सामान सुरक्षित सेव हो गया!");
+            document.getElementById("pName").value = "";
+            document.getElementById("pPrice").value = "";
+        } catch (e) {
+            alert("त्रुटि: " + e.message);
+        }
+    } else {
+        alert("विवरण भरें!");
+    }
+}
+
+// 4. सामान हटाना (Delete)
+async function deleteProduct(id) {
+    if (confirm("क्या आप इसे हटाना चाहते हैं?")) {
+        await db.collection("products").doc(id).delete();
+    }
+}
+
+// 5. लॉगआउट और एग्जिट
+function logoutAdmin() {
+    isAdmin = false;
+    document.getElementById("adminDashboard").style.display = "none";
+    loadProducts();
+}
+
+function openLogin() { document.getElementById("loginModal").style.display = "block"; }
+function closeModal() { document.getElementById("loginModal").style.display = "none"; }
+
+// ऐप शुरू करें
+loadProducts();
+</script>
+
+</body>
+</html>
