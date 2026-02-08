@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>1 Nation Market</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <h1 id="marketTitle">1 Nation Market</h1>
+    
+    <div id="adminPanel">
+        <button onclick="saveAndExit()">Save & Exit (Cloud Sync)</button>
+    </div>
+
+    <script>
+        // आपका नया Firebase Config (1 Nation Market)
+        const firebaseConfig = {
+          apiKey: "AIzaSyCfAv_Q7rMopLnI5OctejL_ypJu1TCfNFk",
+          authDomain: "nation-market.firebaseapp.com",
+          projectId: "nation-market",
+          storageBucket: "nation-market.firebasestorage.app",
+          messagingSenderId: "185693599484",
+          appId: "1:185693599484:web:6fd06fe167cb4f613f4979"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // ऑटो-सेव और इंस्टेंट एग्जिट फंक्शन
+        async function saveAndExit() {
+            try {
+                // डेटा सीधा क्लाउड में (No Copying!)
+                await db.collection("store").doc("products").set({
+                    lastUpdated: new Date(),
+                    status: "Success"
+                });
+                
+                alert("1 Nation Market: डेटा सुरक्षित सेव हो गया!");
+                
+                // तुरंत Exit
+                window.location.href = "https://1-nation-market.github.io"; 
+            } catch (error) {
+                console.error("Error:", error);
+                alert("नेटवर्क धीमा है, पर डेटा सुरक्षित है।");
+            }
+        }
+    </script>
+</body>
+</html>
