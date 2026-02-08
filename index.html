@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1 Nation Market</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        /* [आपका पुराना CSS यहाँ रहेगा, इसे बदलने की ज़रूरत नहीं है] */
+        :root { --main-color: #008080; --secondary-color: #333; --accent-color: #ff6b35; --light-bg: #f8f9fa; --shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); color: #333; min-height: 100vh; }
+        header { background: linear-gradient(135deg, var(--main-color) 0%, #006666 100%); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+        .tagline { font-size: 14px; opacity: 0.9; margin-bottom: 15px; }
+        .search-section { max-width: 800px; margin: 25px auto; padding: 0 20px; }
+        .search-box { position: relative; }
+        .search-box input { width: 100%; padding: 15px 20px 15px 45px; border: 2px solid #ddd; border-radius: 50px; font-size: 16px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+        .product-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); transition: transform 0.3s; }
+        .product-img { width: 100%; height: 220px; object-fit: cover; }
+        .product-content { padding: 20px; }
+        .product-price { font-size: 22px; font-weight: 700; color: var(--main-color); }
+        .admin-btn { position: fixed; bottom: 25px; right: 25px; background: #333; color: white; border: none; padding: 16px 25px; border-radius: 50px; cursor: pointer; font-weight: bold; z-index: 100; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 1000; }
+        .modal-content { background: white; margin: 10% auto; padding: 30px; width: 90%; max-width: 500px; border-radius: 15px; }
+        .form-input { width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; margin-bottom: 15px; }
+        .btn { padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; }
+        .btn-primary { background: var(--main-color); color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>1 Nation Market</h1>
+    <p class="tagline">अक्ल की जीत और खुदा की तलाश | Premium Shopping Experience</p>
+</header>
+
+<div class="search-section">
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search products...">
+    </div>
+</div>
+
+<div class="container">
+    <div class="product-grid" id="product-list">
+        <p style="text-align: center; grid-column: 1/-1;">Loading products...</p>
+    </div>
+</div>
+
+<button class="admin-btn" onclick="openLoginModal()">🔒 Admin Panel</button>
+
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <h3>Admin Login</h3><br>
+        <label>Password</label>
+        <input type="password" id="adminPass" class="form-input" placeholder="Enter password">
+        <button onclick="checkAdmin()" class="btn btn-primary">Login</button>
+        <button onclick="closeLoginModal()" class="btn" style="margin-top:10px;">Close</button>
+    </div>
+</div>
+
+<div id="adminDashboard" class="modal">
+    <div class="modal-content">
+        <h3>Add New Product</h3><br>
+        <input type="text" id="pName" class="form-input" placeholder="Product Name">
+        <input type="number" id="pPrice" class="form-input" placeholder="Price (₹)">
+        <input type="file" id="pImage" accept="image/*" class="form-input" onchange="previewImage(event)">
+        <div id="imagePreview" style="display:none; margin-bottom:15px;">
+            <img id="previewImg" style="width:100%; border-radius:10px;">
+        </div>
+        <button onclick="uploadAndSave()" class="btn btn-success" id="saveBtn">Upload & Save Product</button>
+        <button onclick="closeAdminDashboard()" class="btn" style="margin-top:10px;">Logout</button>
+    </div>
+</div>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+    apiKey: "AIzaSyCfAv_Q7rMopLnI5OctejL_ypJu1TCfNFk",
+    authDomain: "nation-market-2.firebaseapp.com",
+    projectId: "nation-market-2",
+    storageBucket: "nation-market-2.firebasestorage.app",
+    messagingSenderId: "185693599484",
+    appId: "1:185693599484:web:6fd06fe167cb4f613f4979"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let isAdmin = false;
+let allProducts = [];
+
+// Load Products
+function loadProducts() {
+    db.collection("products").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+        allProducts = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            data.id = doc.id;
+            allProducts.push(data);
+        });
+        displayProducts();
+    });
+}
+
+function displayProducts() {
+    const list = document.getElementById("product-list");
+    let html = "";
+    allProducts.forEach(p => {
+        html += `
+            <div class="product-card">
+                <img src="${p.img}" class="product-img">
+                <div class="product-content">
+                    <h3>${p.name}</h3>
+                    <div class="product-price">₹${p.price}</div>
+                    ${isAdmin ? `<button onclick="deleteProduct('${p.id}')" style="color:red; cursor:pointer; margin-top:10px; border:none; background:none;">Delete</button>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    list.innerHTML = html || "<p style='text-align:center; grid-column:1/-1;'>No products found.</p>";
+}
+
+// Admin Logic
+function checkAdmin() {
+    const pass = document.getElementById('adminPass').value;
+    if (pass === "tamir@lI00769") {
+        isAdmin = true;
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+        loadProducts();
+    } else {
+        alert("Incorrect Password!");
+    }
+}
+
+// Upload & Save
+async function uploadAndSave() {
+    const name = document.getElementById('pName').value.trim();
+    const price = document.getElementById('pPrice').value.trim();
+    const fileInput = document.getElementById('pImage');
+    const saveBtn = document.getElementById('saveBtn');
+
+    if (!name || !price || !fileInput.files[0]) {
+        alert("कृपया सभी जानकारी भरें!");
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = "अपलोड हो रहा है...";
+
+    try {
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+
+        const uploadRes = await fetch(`https://api.imgbb.com/1/upload?key=67f67768f51a79857905d4b553e1f579`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const imgData = await uploadRes.json();
+
+        if (imgData && imgData.data && imgData.data.url) {
+            await db.collection("products").add({
+                name: name,
+                price: price,
+                img: imgData.data.url,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert("✅ प्रोडक्ट लाइव हो गया!");
+            location.reload();
+        } else {
+            throw new Error("इमेज अपलोड विफल रही।");
+        }
+    } catch (e) {
+        alert("Error: " + e.message);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = "Upload & Save Product";
+    }
+}
+
+// Delete Logic
+async function deleteProduct(id) {
+    if(confirm("क्या आप इसे हटाना चाहते हैं?")) {
+        await db.collection("products").doc(id).delete();
+    }
+}
+
+// UI Functions
+function openLoginModal() { document.getElementById('loginModal').style.display = 'block'; }
+function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+function closeAdminDashboard() { document.getElementById('adminDashboard').style.display = 'none'; isAdmin = false; loadProducts(); }
+function previewImage(e) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        document.getElementById('previewImg').src = reader.result;
+        document.getElementById('imagePreview').style.display = 'block';
+    };
+    reader.readAsDataURL(e.target.files[0]);
+}
+
+window.onload = loadProducts;
+</script>
+</body>
+</html>
